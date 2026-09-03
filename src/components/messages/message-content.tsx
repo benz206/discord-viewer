@@ -182,7 +182,7 @@ function CodeBlock({ lang, code }: { lang?: string; code: string }) {
         </div>
       ) : null}
       <pre className="scrollbar-discord overflow-x-auto px-3 py-2">
-        <code className="font-mono text-[0.875rem] leading-[1.125rem] whitespace-pre text-subhead">
+        <code className="font-mono text-[0.875rem] leading-[1.125rem] break-words whitespace-pre-wrap text-subhead">
           {code}
         </code>
       </pre>
