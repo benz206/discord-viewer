@@ -42,3 +42,4 @@ next-env.d.ts
 
 # discord data package + sqlite index
 /data/
+/.next-*/
