@@ -30,6 +30,9 @@ analytics event stream, and the raw JSON/CSV/asset files themselves.
 
 `data/` is gitignored. Re-run `pnpm ingest` after replacing the package.
 
+`pnpm crawl` walks every link from `/` against a running server (`pnpm build && pnpm start --port 3040`)
+and reports any page that 404s or renders an error boundary.
+
 ## Where things are
 
 | Route | What it shows |

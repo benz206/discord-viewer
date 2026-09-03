@@ -12,6 +12,8 @@ const notoSans = Noto_Sans({
   display: "swap",
 });
 
+export const dynamic = "force-dynamic";
+
 export const metadata: Metadata = {
   title: "Discord Viewer",
   description: "Browse a personal Discord data package",
