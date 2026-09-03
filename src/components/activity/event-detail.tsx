@@ -56,6 +56,7 @@ export function EventDetail({ event, raw, context, compact }: ActivityEventDetai
   const channel = ids.channelId ? context.channels[ids.channelId] : undefined;
   const message = ids.messageId ? context.messages[ids.messageId] : undefined;
   const messageChannel = message ? context.channels[message.channelId] : undefined;
+  const guildKnown = ids.guildId ? ids.guildId in context.guilds : false;
 
   return (
     <div className="space-y-4">
@@ -81,8 +82,12 @@ export function EventDetail({ event, raw, context, compact }: ActivityEventDetai
             label="Guild"
             value={context.guilds[ids.guildId] ?? ids.guildId}
             links={[
-              { href: guildHref(ids.guildId), text: "Channels" },
-              { href: serverHref(ids.guildId), text: "Server" },
+              ...(guildKnown
+                ? [
+                    { href: guildHref(ids.guildId), text: "Channels" },
+                    { href: serverHref(ids.guildId), text: "Server" },
+                  ]
+                : []),
               { href: activityHref({ guildId: ids.guildId }), text: "Filter activity" },
             ]}
           />
@@ -94,7 +99,7 @@ export function EventDetail({ event, raw, context, compact }: ActivityEventDetai
             label="Channel"
             value={channel ? channel.name : ids.channelId}
             links={[
-              { href: channelHref(ids.channelId, channel?.guildId ?? ids.guildId), text: "Open" },
+              ...(channel ? [{ href: channelHref(ids.channelId, channel.guildId), text: "Open" }] : []),
               { href: activityHref({ channelId: ids.channelId }), text: "Filter activity" },
             ]}
           />

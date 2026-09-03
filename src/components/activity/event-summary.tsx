@@ -4,6 +4,7 @@ import Link from "next/link";
 
 import { channelTypeName, type ActivityEventRow } from "@/lib/data/types";
 import { formatDurationMs } from "@/components/activity/format";
+import { activityHref } from "@/components/activity/query";
 import {
   channelHref,
   guildHref,
@@ -52,7 +53,7 @@ export function ChannelLink({
   const label = channel ? channel.name : channelId;
   return (
     <Link
-      href={channelHref(channelId, channel?.guildId ?? event.guildId)}
+      href={channel ? channelHref(channelId, channel.guildId) : activityHref({ channelId })}
       className={linkClass}
       onClick={(clickEvent) => clickEvent.stopPropagation()}
     >
@@ -70,9 +71,10 @@ export function GuildLink({
 }) {
   const guildId = resolvedGuildId(event, context);
   if (!guildId) return null;
+  const known = guildId in context.guilds;
   return (
     <Link
-      href={guildHref(guildId)}
+      href={known ? guildHref(guildId) : activityHref({ guildId })}
       className={linkClass}
       onClick={(clickEvent) => clickEvent.stopPropagation()}
     >

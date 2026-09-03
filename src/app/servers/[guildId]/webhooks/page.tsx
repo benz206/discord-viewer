@@ -28,7 +28,7 @@ export default async function GuildWebhooksPage({ params }: { params: Promise<{ 
     );
   }
 
-  const avatars = new Set(guild.assets.webhookAvatars.map((asset) => asset.hash));
+  const avatars = new Map(guild.assets.webhookAvatars.map((asset) => [asset.hash, asset.path]));
 
   return (
     <>
@@ -45,10 +45,7 @@ export default async function GuildWebhooksPage({ params }: { params: Promise<{ 
             <div className="space-y-3">
               {webhooks.map((hook) => {
                 const record = hook as unknown as Record<string, unknown>;
-                const avatarPath =
-                  hook.avatar && avatars.has(hook.avatar)
-                    ? `servers/${guild.id}/webhooks/${hook.avatar}.png`
-                    : null;
+                const avatarPath = (hook.avatar && avatars.get(hook.avatar)) || null;
                 return (
                   <div key={hook.id} className="rounded-lg bg-surface-2 p-4">
                     <div className="flex items-start gap-3">
