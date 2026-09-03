@@ -32,6 +32,7 @@ export type ChannelViewProps = {
   topic: string | null;
   typeName: string;
   guildName: string | null;
+  guildId: string | null;
   guildHref: string | null;
   messageCount: number;
   firstTs: number | null;
@@ -164,13 +165,24 @@ function InfoPanel(props: ChannelViewProps) {
           </div>
         ) : null}
 
-        <Link
-          href={`/activity?channelId=${props.channelId}`}
-          className="mt-4 flex items-center gap-2 rounded-lg bg-surface-3 px-3 py-2 text-sm text-link transition-colors hover:bg-hover"
-        >
-          <Waypoints className="size-4" />
-          Activity events for this channel
-        </Link>
+        <div className="mt-4 flex flex-col gap-1.5">
+          <Link
+            href={`/activity?channelId=${props.channelId}`}
+            className="flex items-center gap-2 rounded-lg bg-surface-3 px-3 py-2 text-sm text-link transition-colors hover:bg-hover"
+          >
+            <Waypoints className="size-4" />
+            Activity events for this channel
+          </Link>
+          {props.guildId ? (
+            <Link
+              href={`/activity?guildId=${props.guildId}`}
+              className="flex items-center gap-2 rounded-lg bg-surface-3 px-3 py-2 text-sm text-link transition-colors hover:bg-hover"
+            >
+              <Waypoints className="size-4" />
+              Activity events for this server
+            </Link>
+          ) : null}
+        </div>
       </TabsContent>
 
       <TabsContent

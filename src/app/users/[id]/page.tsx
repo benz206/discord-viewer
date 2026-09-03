@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ChevronLeft, User } from "lucide-react";
+import { ChevronLeft, User, Waypoints } from "lucide-react";
 
 import { listChannelsForUser } from "@/lib/data/channels";
 import { getApplications, getUser } from "@/lib/data/meta";
@@ -183,20 +183,29 @@ export default async function UserProfilePage({ params }: { params: Promise<{ id
           ) : (
             <ul className="space-y-1.5">
               {[...dms, ...groupDms].map((channel) => (
-                <li key={channel.id}>
+                <li
+                  key={channel.id}
+                  className="flex flex-wrap items-center gap-2 rounded-lg bg-surface-2 px-3 py-2"
+                >
                   <Link
                     href={`/channels/@me/${channel.id}`}
-                    className="flex flex-wrap items-center gap-2 rounded-lg bg-surface-2 px-3 py-2 transition-colors hover:bg-hover"
+                    className="min-w-0 flex-1 truncate text-sm text-link hover:underline"
                   >
-                    <span className="min-w-0 flex-1 truncate text-sm text-header">
-                      {channel.indexName ?? channel.name ?? channel.id}
-                    </span>
-                    <Pill>{channelTypeName(channel.type)}</Pill>
-                    <span className="text-xs text-channel">{formatNumber(channel.messageCount)} messages</span>
-                    <span className="text-xs text-faint">
-                      {channel.firstTs ? formatDateTime(channel.firstTs) : "—"} →{" "}
-                      {channel.lastTs ? formatDateTime(channel.lastTs) : "—"}
-                    </span>
+                    {channel.indexName ?? channel.name ?? channel.id}
+                  </Link>
+                  <Pill>{channelTypeName(channel.type)}</Pill>
+                  <span className="text-xs text-channel">{formatNumber(channel.messageCount)} messages</span>
+                  <span className="text-xs text-faint">
+                    {channel.firstTs ? formatDateTime(channel.firstTs) : "—"} →{" "}
+                    {channel.lastTs ? formatDateTime(channel.lastTs) : "—"}
+                  </span>
+                  <Link
+                    href={`/activity?channelId=${channel.id}`}
+                    title="Activity events for this channel"
+                    className="flex items-center gap-1 rounded bg-surface-3 px-1.5 py-1 text-[11px] text-channel transition-colors hover:text-interactive-hover [&_svg]:size-3.5"
+                  >
+                    <Waypoints />
+                    Activity
                   </Link>
                 </li>
               ))}
@@ -228,6 +237,14 @@ export default async function UserProfilePage({ params }: { params: Promise<{ id
                       </Pill>
                     ))}
                   </span>
+                  <Link
+                    href={`/activity?guildId=${hit.guild.id}`}
+                    title="Activity events for this server"
+                    className="flex items-center gap-1 rounded bg-surface-3 px-1.5 py-1 text-[11px] text-channel transition-colors hover:text-interactive-hover [&_svg]:size-3.5"
+                  >
+                    <Waypoints />
+                    Activity
+                  </Link>
                 </li>
               ))}
             </ul>

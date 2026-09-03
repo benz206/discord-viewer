@@ -101,6 +101,7 @@ export default async function ChannelMessagesPage({
       topic={guildChannel?.topic ?? null}
       typeName={channelTypeName(channel.type)}
       guildName={channel.guildName ?? guild?.name ?? null}
+      guildId={channel.guildId}
       guildHref={channel.guildId ? `/channels/${channel.guildId}` : null}
       messageCount={channel.messageCount}
       firstTs={channel.firstTs}
