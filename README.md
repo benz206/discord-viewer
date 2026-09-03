@@ -30,8 +30,23 @@ analytics event stream, and the raw JSON/CSV/asset files themselves.
 
 `data/` is gitignored. Re-run `bun run ingest` after replacing the package.
 
-`bun run crawl` walks every link from `/` against a running server (`bun run build && bun run start --port 3040`)
-and reports any page that 404s or renders an error boundary.
+## What the package does and doesn't contain
+
+Discord only exports messages **you** sent. A DM shows your half of the conversation; the other person
+appears through the channel's recipient list, the user directory, and activity events that reference the
+channel. Other people's messages, attachments files, and server member lists are not in the export.
+Attachments are CDN links that have mostly expired, so they render as unavailable cards.
+
+## Scripts
+
+| Command | Purpose |
+|---|---|
+| `bun run dev` | Dev server at http://localhost:3000 |
+| `bun run build` / `bun run start` | Production build and server |
+| `bun run ingest` | Rebuild `data/index.db` from `data/package/` |
+| `bun run smoke` | Exercise every data-layer function against the index |
+| `bun run crawl` | Crawl a running server for broken pages |
+| `bun run lint` / `bun run tsc --noEmit` | Lint and type check |
 
 ## Where things are
 
@@ -50,5 +65,6 @@ and reports any page that 404s or renders an error boundary.
 
 ## Stack
 
-Next.js 16 App Router, React 19, TypeScript, Tailwind v4, shadcn/ui, better-sqlite3 with FTS5,
-csv-parse, discord-markdown-parser (extended with list rendering and a React AST renderer).
+Bun, Next.js 16 App Router, React 19, TypeScript, Tailwind v4, shadcn/ui, SQLite with FTS5
+(`bun:sqlite` for scripts, better-sqlite3 inside the Next server), csv-parse, and discord-markdown-parser
+extended with list rendering and a React AST renderer.
