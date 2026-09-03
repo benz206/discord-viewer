@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { ChevronLeft, User } from "lucide-react";
 
-import { listChannels } from "@/lib/data/channels";
+import { listChannelsForUser } from "@/lib/data/channels";
 import { getApplications, getUser } from "@/lib/data/meta";
 import { getGuild, listGuilds } from "@/lib/data/servers";
 import { getUserEntry } from "@/lib/data/users";
@@ -27,8 +27,9 @@ export default async function UserProfilePage({ params }: { params: Promise<{ id
   const name = entry ? userDisplayName(entry) : id;
   const avatarHash = entry?.avatar ?? relationship?.user.avatar ?? null;
 
-  const dms = listChannels({ dm: true, limit: 5000 }).filter((channel) => channel.recipients?.includes(id));
-  const groupDms = listChannels({ groupDm: true, limit: 5000 }).filter((channel) => channel.recipients?.includes(id));
+  const shared = listChannelsForUser(id);
+  const dms = shared.filter((channel) => channel.type === 1);
+  const groupDms = shared.filter((channel) => channel.type === 3);
 
   const guildHits = listGuilds()
     .map((row) => {

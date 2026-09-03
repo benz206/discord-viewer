@@ -170,7 +170,7 @@ export function EventDetail({ event, raw, context, compact }: ActivityEventDetai
         <JsonViewer
           value={raw}
           name="event"
-          defaultExpandedDepth={99}
+          expandAll
           chunkSize={100}
           className={cn(compact ? "max-h-[60vh]" : "max-h-[70vh]")}
         />

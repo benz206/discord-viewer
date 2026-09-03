@@ -35,8 +35,12 @@ export interface UserSession {
     creation_time: string;
     expiration_time: string;
     approx_last_used_time?: string;
-    client_info?: { os?: string; platform?: string; location?: string };
+    is_mfa?: boolean;
+    is_bot?: boolean;
+    client_info?: { ip?: string; os?: string; platform?: string };
+    extra_tokens?: unknown;
   };
+  is_soft_deleted: boolean;
 }
 
 export interface Payment {
@@ -51,6 +55,10 @@ export interface Payment {
   description: string;
   flags: number;
   subscription?: Record<string, unknown> | null;
+  payment_source?: PaymentSource | null;
+  sku_id?: string;
+  sku_price?: number;
+  sku_subscription_plan_id?: string;
 }
 
 export interface PaymentSource {
@@ -58,6 +66,8 @@ export interface PaymentSource {
   type: number;
   invalid: boolean;
   flags: number;
+  screen_status?: number;
+  payment_gateway?: number | null;
   email?: string;
   billing_address?: {
     name: string;
@@ -88,6 +98,7 @@ export interface GuildSetting {
     channel_id: string;
     message_notifications?: number;
     muted?: boolean;
+    mute_config?: unknown;
     collapsed?: boolean;
     flags?: number;
   }>;
@@ -105,6 +116,17 @@ export interface Entitlement {
   deleted: boolean;
   gift_code_flags: number;
   sku_name?: string;
+  consumed?: boolean;
+  gifter_user_id?: string;
+  subscription_plan?: {
+    id: string;
+    name: string;
+    interval: number;
+    interval_count: number;
+    tax_inclusive: boolean;
+    sku_id: string;
+  };
+  parent_id?: string;
 }
 
 export interface ActivityApplicationStatistic {
@@ -165,6 +187,8 @@ export interface Application {
   integration_require_code_grant: boolean;
   discoverability_state: number;
   discovery_eligibility_flags: number;
+  install_params?: { scopes: string[]; permissions: string };
+  tags?: string[];
   bot?: DiscordUserRef;
 }
 
@@ -205,8 +229,8 @@ export interface GuildJson {
   afk_timeout?: number;
   application_id?: string | null;
   default_message_notifications?: number;
-  emoji_rev?: number;
-  sticker_rev?: number;
+  emoji_rev?: string | null;
+  sticker_rev?: string | null;
   explicit_content_filter?: number;
   max_members?: number;
   max_presences?: number | null;
@@ -393,6 +417,9 @@ export interface ActivityEventTypeRow {
   domain: string;
   eventType: string;
   count: number;
+  firstTs: number | null;
+  lastTs: number | null;
+  activeDays: number;
 }
 
 export interface ActivityEventRow {
@@ -417,7 +444,15 @@ export interface UserDirectoryEntry {
   name: string | null;
   discriminator: string | null;
   avatar: string | null;
+  note: string | null;
   sources: string[];
+}
+
+export interface MessageCountByGuild {
+  kind: "guild" | "dm" | "group_dm" | "unknown";
+  guildId: string | null;
+  guildName: string | null;
+  count: number;
 }
 
 export interface PackageStats {

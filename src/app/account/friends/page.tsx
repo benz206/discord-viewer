@@ -2,8 +2,8 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { MessageSquare } from "lucide-react";
 
-import { listChannels } from "@/lib/data/channels";
-import { getOwnerId, getUser } from "@/lib/data/meta";
+import { listChannelsForUser } from "@/lib/data/channels";
+import { getUser } from "@/lib/data/meta";
 import { RELATIONSHIP_TYPES } from "@/lib/data/types";
 import { Avatar } from "@/components/common/avatar";
 import { JsonViewer } from "@/components/common/json-viewer";
@@ -16,19 +16,15 @@ export default function FriendsPage() {
   const user = getUser();
   if (!user) notFound();
 
-  const ownerId = getOwnerId();
+  const relationships = asRecords(user.relationships);
   const dmByUser = new Map<string, { id: string; messageCount: number }>();
-  for (const channel of listChannels({ dm: true, limit: 2000 })) {
-    for (const recipient of channel.recipients ?? []) {
-      if (recipient === ownerId) continue;
-      const existing = dmByUser.get(recipient);
-      if (!existing || channel.messageCount > existing.messageCount) {
-        dmByUser.set(recipient, { id: channel.id, messageCount: channel.messageCount });
-      }
-    }
+  for (const relationship of relationships) {
+    const id = String(asRecord(relationship.user).id ?? relationship.id ?? "");
+    if (!id || dmByUser.has(id)) continue;
+    const dm = listChannelsForUser(id).find((channel) => channel.type === 1);
+    if (dm) dmByUser.set(id, { id: dm.id, messageCount: dm.messageCount });
   }
 
-  const relationships = asRecords(user.relationships);
   const byType = new Map<number, typeof relationships>();
   for (const relationship of relationships) {
     const type = Number(relationship.type ?? -1);

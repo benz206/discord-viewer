@@ -1,23 +1,24 @@
 import { Table2 } from "lucide-react";
 
-import { getActivityDaily, listActivityDomains, listActivityEventTypes } from "@/lib/data/activity";
+import { listActivityDomains, listActivityEventTypes } from "@/lib/data/activity";
 import { formatCount } from "@/components/activity/format";
 import { sortDomains } from "@/components/activity/domains";
 import { TypesTable, type EventTypeStat } from "@/components/activity/types-table";
 
+function dayOf(ts: number | null): string | null {
+  return ts === null ? null : new Date(ts).toISOString().slice(0, 10);
+}
+
 export default function ActivityTypesPage() {
   const domains = sortDomains(listActivityDomains());
-  const rows: EventTypeStat[] = listActivityEventTypes().map((type) => {
-    const days = getActivityDaily({ domain: type.domain, eventType: type.eventType });
-    return {
-      domain: type.domain,
-      eventType: type.eventType,
-      count: type.count,
-      activeDays: days.length,
-      firstDay: days[0]?.day ?? null,
-      lastDay: days[days.length - 1]?.day ?? null,
-    };
-  });
+  const rows: EventTypeStat[] = listActivityEventTypes().map((type) => ({
+    domain: type.domain,
+    eventType: type.eventType,
+    count: type.count,
+    activeDays: type.activeDays,
+    firstDay: dayOf(type.firstTs),
+    lastDay: dayOf(type.lastTs),
+  }));
 
   const total = rows.reduce((sum, row) => sum + row.count, 0);
 

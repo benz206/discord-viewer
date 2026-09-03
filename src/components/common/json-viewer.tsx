@@ -9,6 +9,7 @@ export type JsonViewerProps = {
   value: unknown;
   name?: string;
   defaultExpandedDepth?: number;
+  expandAll?: boolean;
   chunkSize?: number;
   className?: string;
 };
@@ -248,6 +249,7 @@ export function JsonViewer({
   value,
   name,
   defaultExpandedDepth = 1,
+  expandAll = false,
   chunkSize = 50,
   className,
 }: JsonViewerProps) {
@@ -262,7 +264,7 @@ export function JsonViewer({
         label={name ?? null}
         value={value}
         depth={0}
-        expandedDepth={defaultExpandedDepth}
+        expandedDepth={expandAll ? Number.POSITIVE_INFINITY : defaultExpandedDepth}
         chunkSize={chunkSize}
         isLast
       />

@@ -18,6 +18,7 @@ function toEntry(row: UserDbRow): UserDirectoryEntry {
     name: row.name,
     discriminator: row.discriminator,
     avatar: row.avatar,
+    note: row.note,
     sources: JSON.parse(row.sources_json) as string[],
   };
 }
@@ -35,7 +36,10 @@ export interface ListUsersOptions {
   offset?: number;
 }
 
-export function listUsers(options: ListUsersOptions = {}): UserDirectoryEntry[] {
+function buildUserFilter(options: ListUsersOptions): {
+  where: string[];
+  params: Record<string, string | number>;
+} {
   const where: string[] = [];
   const params: Record<string, string | number> = {};
   if (options.namedOnly) where.push("name IS NOT NULL");
@@ -47,6 +51,11 @@ export function listUsers(options: ListUsersOptions = {}): UserDirectoryEntry[] 
     where.push("(name LIKE @search OR id LIKE @search)");
     params.search = `%${options.search}%`;
   }
+  return { where, params };
+}
+
+export function listUsers(options: ListUsersOptions = {}): UserDirectoryEntry[] {
+  const { where, params } = buildUserFilter(options);
   params.limit = options.limit ?? 1000;
   params.offset = options.offset ?? 0;
 
@@ -56,9 +65,15 @@ export function listUsers(options: ListUsersOptions = {}): UserDirectoryEntry[] 
   return (db().prepare(sql).all(params) as UserDbRow[]).map(toEntry);
 }
 
-export function getUserEntry(id: string): (UserDirectoryEntry & { note: string | null }) | null {
+export function countUsers(options: ListUsersOptions = {}): number {
+  const { where, params } = buildUserFilter(options);
+  const sql = `SELECT COUNT(*) AS n FROM users ${where.length ? `WHERE ${where.join(" AND ")}` : ""}`;
+  return (db().prepare(sql).get(params) as { n: number }).n;
+}
+
+export function getUserEntry(id: string): UserDirectoryEntry | null {
   const row = db().prepare("SELECT * FROM users WHERE id = ?").get(id) as UserDbRow | undefined;
-  return row ? { ...toEntry(row), note: row.note } : null;
+  return row ? toEntry(row) : null;
 }
 
 export function getUserNotes(): Array<{ id: string; name: string | null; note: string }> {

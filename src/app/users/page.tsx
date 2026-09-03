@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Search, Users } from "lucide-react";
 
-import { buildUserDirectory, getUserNotes, listUsers } from "@/lib/data/users";
+import { buildUserDirectory, countUsers, listUsers } from "@/lib/data/users";
 import { Avatar } from "@/components/common/avatar";
 import { EmptyState } from "@/components/common/empty-state";
 import { USER_SOURCE_LABELS } from "@/components/servers/constants";
@@ -40,15 +40,10 @@ export default async function UsersPage({
   }
   const sources = [...sourceCounts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
 
-  const notes = new Map(getUserNotes().map((note) => [note.id, note.note]));
-  const rows = listUsers({
-    search: search || undefined,
-    source: source || undefined,
-    limit: PAGE_SIZE + 1,
-    offset: start,
-  });
-  const hasMore = rows.length > PAGE_SIZE;
-  const visible = rows.slice(0, PAGE_SIZE);
+  const filter = { search: search || undefined, source: source || undefined };
+  const total = countUsers(filter);
+  const visible = listUsers({ ...filter, limit: PAGE_SIZE, offset: start });
+  const hasMore = start + visible.length < total;
 
   return (
     <PageShell
@@ -135,11 +130,11 @@ export default async function UsersPage({
           />
         ) : (
           <Section
-            title={`${source ? (USER_SOURCE_LABELS[source] ?? source) : "All users"} · ${start + 1}–${start + visible.length}`}
+            title={`${source ? (USER_SOURCE_LABELS[source] ?? source) : "All users"} · ${start + 1}–${start + visible.length} of ${formatNumber(total)}`}
           >
             <ul className="space-y-1.5">
               {visible.map((entry) => {
-                const note = notes.get(entry.id);
+                const note = entry.note;
                 return (
                   <li key={entry.id}>
                     <Link
@@ -187,7 +182,7 @@ export default async function UsersPage({
                 <span />
               )}
               <span className="text-channel">
-                {start + 1}–{start + visible.length}
+                {start + 1}–{start + visible.length} of {formatNumber(total)}
               </span>
               {hasMore ? (
                 <Link

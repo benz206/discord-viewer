@@ -75,6 +75,17 @@ export function listChannels(options: ListChannelsOptions = {}): ChannelRow[] {
   return (db().prepare(sql).all(params) as ChannelDbRow[]).map(toChannel);
 }
 
+export function listChannelsForUser(userId: string): ChannelRow[] {
+  const rows = db()
+    .prepare(
+      `SELECT ${CHANNEL_COLUMNS} FROM channels
+       WHERE recipients_json LIKE @needle
+       ORDER BY message_count DESC, last_ts DESC`,
+    )
+    .all({ needle: `%"${userId}"%` }) as ChannelDbRow[];
+  return rows.map(toChannel).filter((channel) => channel.recipients?.includes(userId));
+}
+
 export function getChannel(id: string): ChannelRow | null {
   const row = db().prepare(`SELECT ${CHANNEL_COLUMNS} FROM channels WHERE id = ?`).get(id) as ChannelDbRow | undefined;
   return row ? toChannel(row) : null;

@@ -1,7 +1,7 @@
 import "server-only";
 
 import { db } from "./db";
-import type { DayCount, MessagePage, MessageRow, SearchHit, SearchResult } from "./types";
+import type { DayCount, MessageCountByGuild, MessagePage, MessageRow, SearchHit, SearchResult } from "./types";
 
 interface MessageDbRow {
   rowid: number;
@@ -200,11 +200,30 @@ export function getMessageCountByDay(channelId?: string): DayCount[] {
   return rows;
 }
 
-export function getMessageCountByGuild(): Array<{ guildId: string | null; guildName: string | null; count: number }> {
+export function getMessageCountByGuild(): MessageCountByGuild[] {
   return db()
     .prepare(
-      `SELECT guild_id AS guildId, guild_name AS guildName, SUM(message_count) AS count
-       FROM channels WHERE message_count > 0 GROUP BY guild_id ORDER BY count DESC`,
+      `SELECT
+         CASE
+           WHEN guild_id IS NOT NULL THEN 'guild'
+           WHEN type = 1 THEN 'dm'
+           WHEN type = 3 THEN 'group_dm'
+           ELSE 'unknown'
+         END AS kind,
+         guild_id AS guildId,
+         guild_name AS guildName,
+         SUM(message_count) AS count
+       FROM channels WHERE message_count > 0 GROUP BY kind, guild_id ORDER BY count DESC`,
     )
-    .all() as Array<{ guildId: string | null; guildName: string | null; count: number }>;
+    .all() as MessageCountByGuild[];
+}
+
+export function getAttachmentStats(): { messages: number; urls: number } {
+  const row = db()
+    .prepare(
+      `SELECT COUNT(*) AS messages, SUM(LENGTH(attachments) - LENGTH(REPLACE(attachments, ' ', '')) + 1) AS urls
+       FROM messages WHERE attachments IS NOT NULL AND attachments <> ''`,
+    )
+    .get() as { messages: number; urls: number | null };
+  return { messages: row.messages, urls: row.urls ?? 0 };
 }

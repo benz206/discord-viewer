@@ -41,6 +41,10 @@ const SUMMARY_KEYS = [
   "search_type",
 ];
 
+const GUILD_ID_KEYS = ["guild_id", "server", "guild"];
+const CHANNEL_ID_KEYS = ["channel_id", "channel"];
+const MESSAGE_ID_KEYS = ["message_id"];
+
 const SCHEMA = `
 CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
 
@@ -153,6 +157,7 @@ CREATE INDEX idx_activity_type_ts ON activity_events(event_type, ts);
 CREATE INDEX idx_activity_ts ON activity_events(ts);
 CREATE INDEX idx_activity_guild_ts ON activity_events(guild_id, ts) WHERE guild_id IS NOT NULL;
 CREATE INDEX idx_activity_channel_ts ON activity_events(channel_id, ts) WHERE channel_id IS NOT NULL;
+CREATE INDEX idx_activity_message ON activity_events(message_id) WHERE message_id IS NOT NULL;
 CREATE INDEX idx_users_name ON users(name);
 `;
 
@@ -190,6 +195,15 @@ function parseIsoUtc(value: string): number | null {
   const ms = text.charCodeAt(19) === 46 ? Number(text.slice(20, 23)) : 0;
   const stamp = Date.UTC(year, month - 1, day, hour, minute, second, ms);
   return Number.isNaN(stamp) ? null : stamp;
+}
+
+function idField(event: Json, keys: string[]): string | null {
+  for (const key of keys) {
+    const value = event[key];
+    if (typeof value === "string" && value.length > 0) return value;
+    if (typeof value === "number") return String(value);
+  }
+  return null;
 }
 
 function dayFromMs(ms: number): string {
@@ -531,9 +545,9 @@ function ingestActivity(db: Database.Database): number {
           ts === null ? null : dayFromMs(ts),
           offset,
           length,
-          (event.guild_id as string) ?? null,
-          (event.channel_id as string) ?? null,
-          (event.message_id as string) ?? null,
+          idField(event, GUILD_ID_KEYS),
+          idField(event, CHANNEL_ID_KEYS),
+          idField(event, MESSAGE_ID_KEYS),
           Object.keys(summary).length > 0 ? JSON.stringify(summary) : null,
         );
         inserted += 1;

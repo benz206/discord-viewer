@@ -32,15 +32,36 @@ function toEvent(row: ActivityDbRow): ActivityEventRow {
   };
 }
 
+interface ActivityEventTypeDbRow {
+  domain: string;
+  event_type: string;
+  count: number;
+  first_ts: number | null;
+  last_ts: number | null;
+  active_days: number;
+}
+
+const EVENT_TYPE_SQL = `
+  SELECT t.domain, t.event_type, t.count, t.first_ts, t.last_ts, COALESCE(d.active_days, 0) AS active_days
+  FROM activity_event_types t
+  LEFT JOIN (
+    SELECT domain, event_type, COUNT(*) AS active_days FROM activity_daily GROUP BY domain, event_type
+  ) d ON d.domain = t.domain AND d.event_type = t.event_type`;
+
 export function listActivityEventTypes(domain?: string): ActivityEventTypeRow[] {
   const rows = domain
     ? (db()
-        .prepare("SELECT domain, event_type, count FROM activity_event_types WHERE domain = ? ORDER BY count DESC")
-        .all(domain) as Array<{ domain: string; event_type: string; count: number }>)
-    : (db()
-        .prepare("SELECT domain, event_type, count FROM activity_event_types ORDER BY count DESC")
-        .all() as Array<{ domain: string; event_type: string; count: number }>);
-  return rows.map((row) => ({ domain: row.domain, eventType: row.event_type, count: row.count }));
+        .prepare(`${EVENT_TYPE_SQL} WHERE t.domain = ? ORDER BY t.count DESC`)
+        .all(domain) as ActivityEventTypeDbRow[])
+    : (db().prepare(`${EVENT_TYPE_SQL} ORDER BY t.count DESC`).all() as ActivityEventTypeDbRow[]);
+  return rows.map((row) => ({
+    domain: row.domain,
+    eventType: row.event_type,
+    count: row.count,
+    firstTs: row.first_ts,
+    lastTs: row.last_ts,
+    activeDays: row.active_days,
+  }));
 }
 
 export interface ListActivityEventsOptions {
@@ -55,8 +76,10 @@ export interface ListActivityEventsOptions {
   cursor?: string;
 }
 
-export function listActivityEvents(options: ListActivityEventsOptions = {}): ActivityEventPage {
-  const limit = Math.min(Math.max(options.limit ?? 100, 1), 500);
+function buildActivityFilter(options: ListActivityEventsOptions): {
+  where: string[];
+  params: Record<string, string | number>;
+} {
   const where: string[] = [];
   const params: Record<string, string | number> = {};
 
@@ -88,13 +111,33 @@ export function listActivityEvents(options: ListActivityEventsOptions = {}): Act
     where.push("message_id = @messageId");
     params.messageId = options.messageId;
   }
+  return { where, params };
+}
+
+function decodeActivityCursor(cursor: string): { ts: number; id: number } | null {
+  const parts = cursor.split(":");
+  if (parts.length !== 2) return null;
+  const ts = Number(parts[0]);
+  const id = Number(parts[1]);
+  if (parts[0].trim() === "" || parts[1].trim() === "") return null;
+  if (!Number.isFinite(ts) || !Number.isInteger(id)) return null;
+  return { ts, id };
+}
+
+export function isValidActivityCursor(cursor: string): boolean {
+  return decodeActivityCursor(cursor) !== null;
+}
+
+export function listActivityEvents(options: ListActivityEventsOptions = {}): ActivityEventPage {
+  const limit = Math.min(Math.max(options.limit ?? 100, 1), 500);
+  const { where, params } = buildActivityFilter(options);
+
   if (options.cursor) {
-    const [cursorTs, cursorId] = options.cursor.split(":").map(Number);
-    if (Number.isFinite(cursorTs) && Number.isFinite(cursorId)) {
-      where.push("(ts < @cursorTs OR (ts = @cursorTs AND id < @cursorId))");
-      params.cursorTs = cursorTs;
-      params.cursorId = cursorId;
-    }
+    const cursor = decodeActivityCursor(options.cursor);
+    if (!cursor) throw new Error(`Invalid activity cursor: ${options.cursor}`);
+    where.push("(ts < @cursorTs OR (ts = @cursorTs AND id < @cursorId))");
+    params.cursorTs = cursor.ts;
+    params.cursorId = cursor.id;
   }
 
   const sql = `SELECT ${EVENT_COLUMNS} FROM activity_events ${
@@ -112,32 +155,7 @@ export function listActivityEvents(options: ListActivityEventsOptions = {}): Act
 }
 
 export function countActivityEvents(options: ListActivityEventsOptions = {}): number {
-  const where: string[] = [];
-  const params: Record<string, string | number> = {};
-  if (options.domain) {
-    where.push("domain = @domain");
-    params.domain = options.domain;
-  }
-  if (options.eventType) {
-    where.push("event_type = @eventType");
-    params.eventType = options.eventType;
-  }
-  if (options.from !== undefined) {
-    where.push("ts >= @from");
-    params.from = options.from;
-  }
-  if (options.to !== undefined) {
-    where.push("ts <= @to");
-    params.to = options.to;
-  }
-  if (options.guildId) {
-    where.push("guild_id = @guildId");
-    params.guildId = options.guildId;
-  }
-  if (options.channelId) {
-    where.push("channel_id = @channelId");
-    params.channelId = options.channelId;
-  }
+  const { where, params } = buildActivityFilter(options);
   const sql = `SELECT COUNT(*) AS n FROM activity_events ${where.length ? `WHERE ${where.join(" AND ")}` : ""}`;
   return (db().prepare(sql).get(params) as { n: number }).n;
 }

@@ -2,12 +2,12 @@ import fs from "node:fs";
 import Link from "next/link";
 import { BarChart3, Download, FolderOpen, Hash, Server, User } from "lucide-react";
 
-import { db, packageFile } from "@/lib/data/db";
+import { packageFile } from "@/lib/data/db";
 import { listActivityDomains } from "@/lib/data/activity";
 import { listChannels } from "@/lib/data/channels";
-import { getMessageCountByDay, getMessageCountByGuild } from "@/lib/data/messages";
+import { getAttachmentStats, getMessageCountByDay, getMessageCountByGuild } from "@/lib/data/messages";
 import { getActivitySources, getPackageStats } from "@/lib/data/meta";
-import { channelTypeName } from "@/lib/data/types";
+import { channelTypeName, type MessageCountByGuild } from "@/lib/data/types";
 import { JsonViewer } from "@/components/common/json-viewer";
 import { AreaChart, BarChart, BarList } from "@/components/stats/charts";
 import { StatTile, StatsSection } from "@/components/stats/stat-tile";
@@ -21,6 +21,13 @@ const NAV = [
   { href: "#activity", label: "Activity domains", icon: User },
   { href: "#package", label: "Package contents", icon: FolderOpen },
 ];
+
+const GUILD_KIND_LABELS: Record<MessageCountByGuild["kind"], string> = {
+  guild: "Guild",
+  dm: "Direct messages",
+  group_dm: "Group DMs",
+  unknown: "Guild-less channels",
+};
 
 function fillDays(days: Array<{ day: string; count: number }>) {
   if (days.length === 0) return [];
@@ -55,12 +62,7 @@ export default function StatsPage() {
   const domains = listActivityDomains();
   const sources = getActivitySources();
 
-  const attachments = db()
-    .prepare(
-      `SELECT COUNT(*) AS messages, SUM(LENGTH(attachments) - LENGTH(REPLACE(attachments, ' ', '')) + 1) AS urls
-       FROM messages WHERE attachments IS NOT NULL AND attachments <> ''`,
-    )
-    .get() as { messages: number; urls: number | null };
+  const attachments = getAttachmentStats();
 
   const readme = fs.readFileSync(packageFile("README.txt"), "utf8");
   const programs = fs.readdirSync(packageFile("programs"));
@@ -110,7 +112,7 @@ export default function StatsPage() {
               <StatTile label="Known users" value={formatNumber(stats.userCount)} />
               <StatTile
                 label="Attachments"
-                value={formatNumber(attachments.urls ?? 0)}
+                value={formatNumber(attachments.urls)}
                 hint={`${formatNumber(attachments.messages)} messages with attachments`}
               />
               <StatTile label="Activity events" value={formatNumber(stats.activityEventCount)} />
@@ -170,7 +172,7 @@ export default function StatsPage() {
           <StatsSection
             id="guilds"
             title="Messages by guild"
-            description="Channels with no guild in the package (DMs, group DMs and orphan guild channels) are grouped together."
+            description="Guild-less channels are split into direct messages, group DMs and orphan guild channels."
             action={
               <Link href="/servers" className="text-xs text-link hover:underline">
                 All servers
@@ -180,14 +182,14 @@ export default function StatsPage() {
             <div className="rounded-lg bg-surface-2 py-1">
               <BarList
                 items={byGuild.map((guild) => ({
-                  key: guild.guildId ?? "none",
+                  key: guild.guildId ?? guild.kind,
                   value: guild.count,
                   label: guild.guildId ? (
                     <Link href={`/servers/${guild.guildId}`} className="text-link hover:underline">
                       {guild.guildName ?? guild.guildId}
                     </Link>
                   ) : (
-                    "DMs & guild-less channels"
+                    GUILD_KIND_LABELS[guild.kind]
                   ),
                   hint: guild.guildId ?? "no guild id",
                 }))}

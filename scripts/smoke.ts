@@ -6,10 +6,12 @@ import {
   buildUserDirectory,
   channelTypeName,
   countActivityEvents,
+  countUsers,
   getActivityDaily,
   getActivityEvent,
   getActivitySources,
   getApplications,
+  getAttachmentStats,
   getChannel,
   getChannelDisplayName,
   getGuild,
@@ -24,10 +26,12 @@ import {
   getUserAvatarPath,
   getUserEntry,
   getUserNotes,
+  isValidActivityCursor,
   listActivityDomains,
   listActivityEventTypes,
   listActivityEvents,
   listChannels,
+  listChannelsForUser,
   listGuilds,
   listGuildsWithChannels,
   listUsers,
@@ -122,7 +126,9 @@ function main(): void {
   const days = timed("getMessageCountByDay", () => getMessageCountByDay());
   check("getMessageCountByDay", { days: days.length, first: days[0], last: days[days.length - 1] });
   check("getMessageCountByDay(channel)", getMessageCountByDay(busiest.id).length);
-  check("getMessageCountByGuild", getMessageCountByGuild().slice(0, 3));
+  check("getMessageCountByGuild", getMessageCountByGuild().slice(0, 5));
+  check("getMessageCountByGuild.kinds", [...new Set(getMessageCountByGuild().map((row) => row.kind))]);
+  check("getAttachmentStats", getAttachmentStats());
 
   check("listActivityDomains", listActivityDomains());
   const types = timed("listActivityEventTypes", () => listActivityEventTypes());
@@ -138,6 +144,20 @@ function main(): void {
     listActivityEvents({ guildId: richGuild.id, limit: 2 }).events.map((e) => e.eventType),
   );
   check("countActivityEvents", countActivityEvents({ domain: "Tns", eventType: "send_message" }));
+  const withMessage = listActivityEvents({ eventType: "send_message", limit: 1 }).events[0];
+  check("countActivityEvents.messageId", {
+    messageId: withMessage?.messageId,
+    channelId: withMessage?.channelId,
+    n: countActivityEvents({ messageId: withMessage?.messageId ?? "" }),
+  });
+  check("isValidActivityCursor", ["1:2", "NaN:2", "1:x", "1", "1:2:3"].map(isValidActivityCursor));
+  let cursorRejected = false;
+  try {
+    listActivityEvents({ cursor: "NaN:NaN" });
+  } catch {
+    cursorRejected = true;
+  }
+  check("listActivityEvents.badCursor", cursorRejected);
 
   const raw = timed("getActivityEvent", () => getActivityEvent(events.events[0].id));
   check("getActivityEvent", {
@@ -156,8 +176,14 @@ function main(): void {
   const named = listUsers({ namedOnly: true, limit: 3 });
   check("listUsers", named);
   check("listUsers.source", listUsers({ source: "ban", limit: 3 }).map((entry) => entry.id));
+  check("countUsers", { all: countUsers(), named: countUsers({ namedOnly: true }), bans: countUsers({ source: "ban" }) });
   check("getUserEntry", getUserEntry(named[0]?.id ?? ""));
   check("getUserNotes", getUserNotes().slice(0, 2));
+  const dmPartner = listChannels({ dm: true, withMessagesOnly: true, limit: 1 })[0]?.recipients?.[0] ?? "";
+  check(
+    "listChannelsForUser",
+    listChannelsForUser(dmPartner).map((channel) => ({ id: channel.id, type: channel.type, n: channel.messageCount })),
+  );
 
   check("resolvePackageAsset", resolvePackageAsset("account/avatar.gif"));
   check("resolvePackageAsset(guild icon)", guild?.assets.icon ? resolvePackageAsset(guild.assets.icon)?.mimeType : null);
