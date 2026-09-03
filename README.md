@@ -1,36 +1,51 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# discord-viewer
 
-## Getting Started
+A local, Discord-styled browser for a Discord data package export. Every file in the package is reachable:
+messages (DMs, group DMs, server channels), server settings (roles, channels, emoji, webhooks, bans, audit log),
+account data (profile, connections, friends, sessions, billing, guild settings, applications, notes), the raw
+analytics event stream, and the raw JSON/CSV/asset files themselves.
 
-First, run the development server:
+## Setup
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+1. Extract the package so `data/package/` contains `account/`, `messages/`, `servers/`, `activity/`, `README.txt`:
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+   ```sh
+   mkdir -p data && unzip -q ~/path/to/package.zip -d data/package
+   ```
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+2. Install and build the SQLite index (about 20 seconds, ~700 MB at `data/index.db`):
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+   ```sh
+   pnpm install
+   pnpm ingest
+   ```
 
-## Learn More
+3. Run it:
 
-To learn more about Next.js, take a look at the following resources:
+   ```sh
+   pnpm dev
+   ```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+   Open http://localhost:3000.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+`data/` is gitignored. Re-run `pnpm ingest` after replacing the package.
 
-## Deploy on Vercel
+## Where things are
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+| Route | What it shows |
+|---|---|
+| `/channels/@me` | DM home and every DM / group DM conversation |
+| `/channels/<guildId>/<channelId>` | Server channel messages, infinite scroll, `?message=<id>` jumps |
+| `/channels/unknown` | Channels whose export has no guild information |
+| `/search` | Full-text search over all messages |
+| `/servers/<guildId>/...` | Server settings clone: overview, roles, channels, emoji, webhooks, bans, audit log, raw files |
+| `/users`, `/users/<id>` | Every user id the package mentions, with what is known about them |
+| `/account/...` | User settings clone over `account/user.json` and bot applications |
+| `/activity` | Explorer over the 1.7M analytics events, filterable and deep-linkable |
+| `/stats` | Package-wide dashboard |
+| `/api/asset/<path>` | Any raw file from the package |
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Stack
+
+Next.js 16 App Router, React 19, TypeScript, Tailwind v4, shadcn/ui, better-sqlite3 with FTS5,
+csv-parse, discord-markdown-parser (extended with list rendering and a React AST renderer).
