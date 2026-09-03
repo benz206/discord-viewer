@@ -16,21 +16,21 @@ analytics event stream, and the raw JSON/CSV/asset files themselves.
 2. Install and build the SQLite index (about 20 seconds, ~700 MB at `data/index.db`):
 
    ```sh
-   pnpm install
-   pnpm ingest
+   bun install
+   bun run ingest
    ```
 
 3. Run it:
 
    ```sh
-   pnpm dev
+   bun run dev
    ```
 
    Open http://localhost:3000.
 
-`data/` is gitignored. Re-run `pnpm ingest` after replacing the package.
+`data/` is gitignored. Re-run `bun run ingest` after replacing the package.
 
-`pnpm crawl` walks every link from `/` against a running server (`pnpm build && pnpm start --port 3040`)
+`bun run crawl` walks every link from `/` against a running server (`bun run build && bun run start --port 3040`)
 and reports any page that 404s or renders an error boundary.
 
 ## Where things are

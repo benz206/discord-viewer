@@ -2,22 +2,20 @@ import "server-only";
 
 import fs from "node:fs";
 import path from "node:path";
-import Database from "better-sqlite3";
+import { openDatabase, type SqliteDatabase } from "./sqlite";
 
 export const PACKAGE_DIR = path.join(process.cwd(), "data", "package");
 export const DB_PATH = path.join(process.cwd(), "data", "index.db");
 
-let instance: Database.Database | null = null;
+let instance: SqliteDatabase | null = null;
 
-export function db(): Database.Database {
+export function db(): SqliteDatabase {
   if (instance) return instance;
   if (!fs.existsSync(DB_PATH)) {
-    throw new Error(`Missing ${DB_PATH}. Run \`pnpm ingest\` first.`);
+    throw new Error(`Missing ${DB_PATH}. Run \`bun run ingest\` first.`);
   }
-  const connection = new Database(DB_PATH, { readonly: true, fileMustExist: true });
-  connection.pragma("cache_size = -65536");
-  connection.pragma("temp_store = MEMORY");
-  connection.pragma("mmap_size = 268435456");
+  const connection = openDatabase(DB_PATH, { readonly: true });
+  connection.exec("PRAGMA cache_size = -65536; PRAGMA temp_store = MEMORY; PRAGMA mmap_size = 268435456;");
   instance = connection;
   return instance;
 }

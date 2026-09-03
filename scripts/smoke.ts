@@ -1,5 +1,5 @@
 // Exercises every exported data-layer function against data/index.db.
-// Run with `pnpm smoke` (needs --conditions=react-server so `server-only` resolves to a no-op).
+// Run with `bun run smoke` (needs --conditions=react-server so `server-only` resolves to a no-op).
 
 import {
   auditLogActionName,

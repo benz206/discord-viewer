@@ -1,7 +1,7 @@
 # Shared brief for page-building agents
 
 Project: /Users/benz/Documents/discord-viewer — Next.js 16 (App Router, read node_modules/next/dist/docs/ before
-writing; conventions differ from older Next), React 19, TypeScript, Tailwind v4, shadcn (base-ui), pnpm.
+writing; conventions differ from older Next), React 19, TypeScript, Tailwind v4, shadcn (base-ui), bun.
 Purpose: a local viewer that lets the owner click through and read ABSOLUTELY EVERYTHING in their Discord data
 package, styled like the Discord desktop client (dark theme).
 
@@ -37,10 +37,10 @@ if you need a change there, make a new component in your own folder instead.
 
 ## Rules
 - No code comments. Simple, props-driven components; server components by default, client only where needed.
-- `pnpm exec tsc --noEmit` and `pnpm lint` must pass for your files.
-- Verify visually: run your own dev server with `NEXT_DIST_DIR=.next-<name> pnpm dev --port <yourPort>` and
+- `bun run tsc --noEmit` and `bun run lint` must pass for your files.
+- Verify visually: run your own dev server with `NEXT_DIST_DIR=.next-<name> bun run dev --port <yourPort>` and
   curl / headless-chrome screenshot your routes. Kill it when done.
 - Commit with plain `git commit -m` — no Co-Authored-By, no session trailers. `git add` ONLY your own paths
   explicitly (never `git add -A`). Other agents commit concurrently; if a commit fails due to index.lock, retry.
-- Do not run `pnpm ingest` (data/index.db already exists) and do not touch scripts/ or src/lib/data/.
+- Do not run `bun run ingest` (data/index.db already exists) and do not touch scripts/ or src/lib/data/.
   If you find a bug in the data layer, note it in your final report instead of fixing it.

@@ -38,7 +38,7 @@ export function getApplications(): ApplicationEntry[] {
 
 export function getPackageStats(): PackageStats {
   const row = db().prepare("SELECT value FROM meta WHERE key = 'stats'").get() as { value: string } | undefined;
-  if (!row) throw new Error("Missing ingest stats. Run `pnpm ingest` first.");
+  if (!row) throw new Error("Missing ingest stats. Run `bun run ingest` first.");
   return JSON.parse(row.value) as PackageStats;
 }
 

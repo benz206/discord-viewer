@@ -1,10 +1,10 @@
 // Builds data/index.db from the extracted Discord data package at data/package.
-// Run with `pnpm ingest`. Deletes and rebuilds the database from scratch.
+// Run with `bun run ingest`. Deletes and rebuilds the database from scratch.
 
 import fs from "node:fs";
 import path from "node:path";
 import { parse } from "csv-parse";
-import Database from "better-sqlite3";
+import { openDatabase, type SqliteDatabase } from "../src/lib/data/sqlite";
 
 const ROOT = process.cwd();
 const PACKAGE_DIR = path.join(ROOT, "data", "package");
@@ -246,7 +246,7 @@ function recordUser(
   if (fields?.note && !entry.note) entry.note = fields.note;
 }
 
-function ingestAccount(db: Database.Database): void {
+function ingestAccount(db: SqliteDatabase): void {
   const user = readJson<Json>(path.join(PACKAGE_DIR, "account", "user.json"));
   if (!user) return;
   recordUser(user.id as string, "account", {
@@ -283,7 +283,7 @@ function ingestAccount(db: Database.Database): void {
   }
 }
 
-function ingestGuilds(db: Database.Database): number {
+function ingestGuilds(db: SqliteDatabase): number {
   const index = readJson<Record<string, string>>(path.join(PACKAGE_DIR, "servers", "index.json")) ?? {};
   const insert = db.prepare(`
     INSERT INTO guilds (
@@ -344,7 +344,7 @@ function ingestGuilds(db: Database.Database): number {
   return Object.keys(index).length;
 }
 
-function ingestChannels(db: Database.Database): number {
+function ingestChannels(db: SqliteDatabase): number {
   const index = readJson<Record<string, string | null>>(path.join(PACKAGE_DIR, "messages", "index.json")) ?? {};
   const messagesDir = path.join(PACKAGE_DIR, "messages");
   const dirs = fs.readdirSync(messagesDir).filter((entry) => entry.startsWith("c"));
@@ -393,7 +393,7 @@ function ingestChannels(db: Database.Database): number {
   return dirs.length;
 }
 
-async function ingestMessages(db: Database.Database): Promise<number> {
+async function ingestMessages(db: SqliteDatabase): Promise<number> {
   const messagesDir = path.join(PACKAGE_DIR, "messages");
   const dirs = fs.readdirSync(messagesDir).filter((entry) => entry.startsWith("c"));
 
@@ -492,7 +492,7 @@ function eachLine(file: string, onLine: (line: string, offset: number, length: n
   return lines;
 }
 
-function ingestActivity(db: Database.Database): number {
+function ingestActivity(db: SqliteDatabase): number {
   const insertEvent = db.prepare(`
     INSERT INTO activity_events (domain, event_type, ts, day, byte_offset, byte_length, guild_id, channel_id, message_id, summary_json)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -567,7 +567,7 @@ function ingestActivity(db: Database.Database): number {
   return total;
 }
 
-function buildAggregates(db: Database.Database): void {
+function buildAggregates(db: SqliteDatabase): void {
   db.exec(`
     INSERT INTO activity_event_types (domain, event_type, count, first_ts, last_ts)
     SELECT domain, event_type, COUNT(*), MIN(ts), MAX(ts) FROM activity_events GROUP BY domain, event_type;
@@ -581,7 +581,7 @@ function buildAggregates(db: Database.Database): void {
   `);
 }
 
-function persistUsers(db: Database.Database): number {
+function persistUsers(db: SqliteDatabase): number {
   const insert = db.prepare("INSERT OR REPLACE INTO users (id, name, discriminator, avatar, note, sources_json) VALUES (?, ?, ?, ?, ?, ?)");
   const run = db.transaction(() => {
     for (const [id, entry] of userDirectory) {
@@ -602,11 +602,11 @@ async function main(): Promise<void> {
     if (fs.existsSync(file)) fs.unlinkSync(file);
   }
 
-  const db = new Database(DB_PATH);
-  db.pragma("journal_mode = OFF");
-  db.pragma("synchronous = OFF");
-  db.pragma("temp_store = MEMORY");
-  db.pragma("cache_size = -262144");
+  const db = openDatabase(DB_PATH);
+  db.exec("PRAGMA journal_mode = OFF;");
+  db.exec("PRAGMA synchronous = OFF;");
+  db.exec("PRAGMA temp_store = MEMORY;");
+  db.exec("PRAGMA cache_size = -262144;");
   db.exec(SCHEMA);
 
   log("account…");

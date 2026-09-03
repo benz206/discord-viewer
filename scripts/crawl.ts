@@ -1,6 +1,6 @@
-#!/usr/bin/env tsx
+#!/usr/bin/env bun
 // Crawls the running app from "/" and reports broken pages.
-// Usage: pnpm crawl [baseUrl] [--max=3000] [--per-pattern=30] [--concurrency=8]
+// Usage: bun run crawl [baseUrl] [--max=3000] [--per-pattern=30] [--concurrency=8]
 
 const args = process.argv.slice(2);
 const flag = (name: string, fallback: number) => {
