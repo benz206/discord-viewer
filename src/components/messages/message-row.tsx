@@ -1,7 +1,8 @@
 "use client";
 
 import { memo, useState } from "react";
-import { Pencil, Pin, Reply } from "lucide-react";
+import Link from "next/link";
+import { Check, Copy, Pencil, Pin, Reply, Waypoints } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { Avatar } from "@/components/common/avatar";
@@ -82,6 +83,43 @@ function AuthorName({
     >
       {author.name}
     </button>
+  );
+}
+
+const actionClass =
+  "flex size-7 items-center justify-center text-interactive transition-colors hover:bg-hover hover:text-interactive-hover [&_svg]:size-4";
+
+function MessageActions({ id }: { id: string }) {
+  const [copied, setCopied] = useState(false);
+
+  return (
+    <div className="absolute -top-3 right-4 z-10 hidden items-center overflow-hidden rounded border border-divider bg-surface-2 shadow-md group-focus-within:flex group-hover:flex">
+      <Link
+        href={`/activity?messageId=${id}`}
+        aria-label="Activity events for this message"
+        title="Activity events"
+        className={actionClass}
+      >
+        <Waypoints />
+      </Link>
+      <button
+        type="button"
+        onClick={() => {
+          navigator.clipboard?.writeText(id).then(
+            () => {
+              setCopied(true);
+              setTimeout(() => setCopied(false), 1200);
+            },
+            () => undefined,
+          );
+        }}
+        aria-label="Copy message ID"
+        title={copied ? "Copied" : `Copy ID ${id}`}
+        className={actionClass}
+      >
+        {copied ? <Check className="text-positive" /> : <Copy />}
+      </button>
+    </div>
   );
 }
 
@@ -189,6 +227,8 @@ function MessageRowImpl({
         className,
       )}
     >
+      <MessageActions id={message.id} />
+
       {compact ? (
         <>
           <time
