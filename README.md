@@ -27,6 +27,11 @@ JSON/CSV/asset files themselves.
    Expect roughly 90 seconds and ~1.4 GB at `data/index.db` for an 8 GB package — the analytics
    event stream dominates both.
 
+   If `bun install` fails trying to compile `better-sqlite3` (it shells out to `node-gyp`, which
+   wants Python and a C++ toolchain), use `bun install --ignore-scripts`. The package ships prebuilt
+   binaries for Linux, macOS and Windows on x64 and arm64, and those are what actually get loaded —
+   the source build is only a fallback for platforms without one.
+
 3. Run it:
 
    ```sh
