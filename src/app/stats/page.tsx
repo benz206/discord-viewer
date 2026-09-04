@@ -6,7 +6,8 @@ import { packageFile } from "@/lib/data/db";
 import { listActivityDomains } from "@/lib/data/activity";
 import { listChannels } from "@/lib/data/channels";
 import { getAttachmentStats, getMessageCountByDay, getMessageCountByGuild } from "@/lib/data/messages";
-import { getActivitySources, getPackageStats } from "@/lib/data/meta";
+import { getApplications, getActivitySources, getPackageStats, getUserAvatarPath } from "@/lib/data/meta";
+import { listPackageEntries } from "@/lib/data/package-extras";
 import { channelTypeName, type MessageCountByGuild } from "@/lib/data/types";
 import { JsonViewer } from "@/components/common/json-viewer";
 import { AreaChart, BarChart, BarList } from "@/components/stats/charts";
@@ -21,6 +22,17 @@ const NAV = [
   { href: "#activity", label: "Activity domains", icon: User },
   { href: "#package", label: "Package contents", icon: FolderOpen },
 ];
+
+// Top-level package folder (lowercased) to the route that browses it.
+const PACKAGE_ROUTES: Record<string, string> = {
+  account: "/account",
+  messages: "/channels/@me",
+  servers: "/servers",
+  activity: "/activity",
+  activities: "/account/activities",
+  ads: "/account/ads",
+  support_tickets: "/account/support-tickets",
+};
 
 const GUILD_KIND_LABELS: Record<MessageCountByGuild["kind"], string> = {
   guild: "Guild",
@@ -65,8 +77,18 @@ export default function StatsPage() {
   const attachments = getAttachmentStats();
 
   const readme = fs.readFileSync(packageFile("README.txt"), "utf8");
-  const programs = fs.readdirSync(packageFile("programs"));
   const activityBytes = sources.reduce((total, source) => total + source.bytes, 0);
+  const packageEntries = listPackageEntries();
+  const avatarName = getUserAvatarPath()?.split("/").pop() ?? null;
+  const applicationCount = getApplications().length;
+
+  // Per-entry summaries for the folders we can describe better than "n items".
+  const entrySummaries: Record<string, React.ReactNode> = {
+    account: `user.json, ${avatarName ?? "no avatar"}, ${formatNumber(applicationCount)} bot applications`,
+    messages: `${formatNumber(stats.channelCount)} channels, ${formatNumber(stats.messageCount)} messages`,
+    servers: `${formatNumber(stats.guildCount)} guilds`,
+    activity: `${formatNumber(stats.activityEventCount)} events · ${formatBytes(activityBytes)}`,
+  };
 
   return (
     <div className="flex min-h-0 min-w-0 flex-1 overflow-hidden bg-surface text-normal">
@@ -117,7 +139,11 @@ export default function StatsPage() {
               />
               <StatTile label="Activity events" value={formatNumber(stats.activityEventCount)} />
               <StatTile label="Activity event types" value={formatNumber(stats.activityEventTypeCount)} />
-              <StatTile label="Activity bytes" value={formatBytes(activityBytes)} hint="3 NDJSON files" />
+              <StatTile
+                label="Activity bytes"
+                value={formatBytes(activityBytes)}
+                hint={`${formatNumber(sources.length)} NDJSON ${sources.length === 1 ? "file" : "files"}`}
+              />
               <StatTile label="Days with messages" value={formatNumber(getMessageCountByDay().length)} />
               <StatTile
                 label="First message"
@@ -273,69 +299,46 @@ export default function StatsPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  <tr className="border-b border-divider">
-                    <td className="px-3 py-2 font-mono text-[12px] text-mention-fg">account/</td>
-                    <td className="px-3 py-2">user.json, avatar.gif, 5 bot applications</td>
-                    <td className="px-3 py-2">
-                      <Link href="/account" className="text-link hover:underline">
-                        /account
-                      </Link>
-                    </td>
-                  </tr>
-                  <tr className="border-b border-divider">
-                    <td className="px-3 py-2 font-mono text-[12px] text-mention-fg">messages/</td>
-                    <td className="px-3 py-2">
-                      {formatNumber(stats.channelCount)} channels, {formatNumber(stats.messageCount)} messages
-                    </td>
-                    <td className="px-3 py-2">
-                      <Link href="/channels/@me" className="text-link hover:underline">
-                        /channels
-                      </Link>
-                    </td>
-                  </tr>
-                  <tr className="border-b border-divider">
-                    <td className="px-3 py-2 font-mono text-[12px] text-mention-fg">servers/</td>
-                    <td className="px-3 py-2">{formatNumber(stats.guildCount)} guilds</td>
-                    <td className="px-3 py-2">
-                      <Link href="/servers" className="text-link hover:underline">
-                        /servers
-                      </Link>
-                    </td>
-                  </tr>
-                  <tr className="border-b border-divider">
-                    <td className="px-3 py-2 font-mono text-[12px] text-mention-fg">activity/</td>
-                    <td className="px-3 py-2">
-                      {formatNumber(stats.activityEventCount)} events · {formatBytes(activityBytes)}
-                    </td>
-                    <td className="px-3 py-2">
-                      <Link href="/activity" className="text-link hover:underline">
-                        /activity
-                      </Link>
-                    </td>
-                  </tr>
-                  <tr className="border-b border-divider">
-                    <td className="px-3 py-2 font-mono text-[12px] text-mention-fg">programs/</td>
-                    <td className="px-3 py-2">
-                      {programs.length === 0 ? (
-                        <span className="text-faint">empty directory — Discord shipped nothing here</span>
+                  {packageEntries.map((entry) => {
+                    const key = entry.name.toLowerCase();
+                    const route = PACKAGE_ROUTES[key];
+                    const summary =
+                      entrySummaries[key] ??
+                      (entry.isDirectory ? (
+                        entry.childCount === 0 ? (
+                          <span className="text-faint">empty directory — Discord shipped nothing here</span>
+                        ) : (
+                          `${formatNumber(entry.childCount)} ${entry.childCount === 1 ? "entry" : "entries"}`
+                        )
                       ) : (
-                        programs.join(", ")
-                      )}
-                    </td>
-                    <td className="px-3 py-2 text-faint">—</td>
-                  </tr>
-                  <tr>
-                    <td className="px-3 py-2 font-mono text-[12px] text-mention-fg">README.txt</td>
-                    <td className="px-3 py-2">{formatBytes(Buffer.byteLength(readme))} welcome text</td>
-                    <td className="px-3 py-2">
-                      <a
-                        href="/api/asset/README.txt"
-                        className="inline-flex items-center gap-1 text-link hover:underline"
-                      >
-                        <Download className="size-3.5" /> README.txt
-                      </a>
-                    </td>
-                  </tr>
+                        formatBytes(entry.size)
+                      ));
+                    return (
+                      <tr key={entry.name} className="border-b border-divider last:border-0">
+                        <td className="px-3 py-2 font-mono text-[12px] text-mention-fg">
+                          {entry.name}
+                          {entry.isDirectory ? "/" : ""}
+                        </td>
+                        <td className="px-3 py-2">{summary}</td>
+                        <td className="px-3 py-2">
+                          {route ? (
+                            <Link href={route} className="text-link hover:underline">
+                              {route}
+                            </Link>
+                          ) : entry.isDirectory ? (
+                            <span className="text-faint">—</span>
+                          ) : (
+                            <a
+                              href={`/api/asset/${entry.name}`}
+                              className="inline-flex items-center gap-1 text-link hover:underline"
+                            >
+                              <Download className="size-3.5" /> {entry.name}
+                            </a>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

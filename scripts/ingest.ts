@@ -505,6 +505,29 @@ interface MessageRecord {
 }
 
 /**
+ * messages.json writes each message ID as a bare JSON number, but a 19-digit
+ * snowflake is far past Number.MAX_SAFE_INTEGER — JSON.parse would silently
+ * round 1003829486170681515 to ...500 and break every permalink. Quote the value
+ * before parsing so it survives as an exact string.
+ *
+ * `"ID":` can only ever be a key here: inside a JSON string the quotes would be
+ * backslash-escaped, so the pattern cannot match message text.
+ */
+function readMessagesJson(file: string): Json[] {
+  let text: string;
+  try {
+    text = fs.readFileSync(file, "utf8");
+  } catch {
+    return [];
+  }
+  try {
+    return JSON.parse(text.replace(/"ID":\s*(\d+)/g, '"ID":"$1"')) as Json[];
+  } catch {
+    return [];
+  }
+}
+
+/**
  * Yields a channel's messages from whichever transcript the package ships.
  * Current exports write messages.json (an array of {ID, Timestamp, Contents,
  * Attachments}, with ID as a number); older ones wrote messages.csv with the
@@ -514,7 +537,7 @@ interface MessageRecord {
 async function* readChannelMessages(dir: string): AsyncGenerator<MessageRecord> {
   const jsonFile = path.join(dir, "messages.json");
   if (fs.existsSync(jsonFile)) {
-    for (const row of readJson<Json[]>(jsonFile) ?? []) {
+    for (const row of readMessagesJson(jsonFile)) {
       yield {
         id: row.ID === null || row.ID === undefined ? "" : String(row.ID),
         timestamp: typeof row.Timestamp === "string" ? row.Timestamp : "",

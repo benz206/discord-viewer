@@ -5,5 +5,6 @@ export * from "./messages";
 export * from "./servers";
 export * from "./activity";
 export * from "./assets";
+export * from "./package-extras";
 export * from "./users";
 export { db, PACKAGE_DIR, DB_PATH } from "./db";

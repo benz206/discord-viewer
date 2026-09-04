@@ -47,6 +47,45 @@ function listDir(dir: string): string[] {
 }
 
 /* ------------------------------------------------------------------ *
+ * package root
+ * ------------------------------------------------------------------ */
+
+export interface PackageEntry {
+  /** Name exactly as Discord wrote it, e.g. "Support_Tickets". */
+  name: string;
+  isDirectory: boolean;
+  /** Immediate children for a directory, byte size for a file. */
+  childCount: number;
+  size: number;
+}
+
+/**
+ * Every top-level entry of the extracted package. Read from disk rather than
+ * hardcoded, so folders that come and go between export versions (programs/,
+ * Ads/, Activities/, Support_Tickets/) are all accounted for.
+ */
+export function listPackageEntries(): PackageEntry[] {
+  const entries: PackageEntry[] = [];
+  for (const name of listDir(PACKAGE_DIR)) {
+    const absolute = path.join(PACKAGE_DIR, name);
+    let stats: fs.Stats;
+    try {
+      stats = fs.statSync(absolute);
+    } catch {
+      continue;
+    }
+    const isDir = stats.isDirectory();
+    entries.push({
+      name,
+      isDirectory: isDir,
+      childCount: isDir ? listDir(absolute).length : 0,
+      size: isDir ? 0 : stats.size,
+    });
+  }
+  return entries;
+}
+
+/* ------------------------------------------------------------------ *
  * account/user_data_exports
  * ------------------------------------------------------------------ */
 

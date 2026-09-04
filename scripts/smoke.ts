@@ -9,8 +9,13 @@ import {
   countUsers,
   getActivityDaily,
   getActivityEvent,
+  getActivityGroups,
   getActivitySources,
+  getAds,
   getApplications,
+  getDataExports,
+  getRecentAvatars,
+  getSupportTickets,
   getAttachmentStats,
   getChannel,
   getChannelDisplayName,
@@ -34,6 +39,7 @@ import {
   listChannelsForUser,
   listGuilds,
   listGuildsWithChannels,
+  listPackageEntries,
   listUsers,
   resolvePackageAsset,
   searchMessages,
@@ -61,6 +67,23 @@ function main(): void {
   check("getUserAvatarPath", getUserAvatarPath());
   check("getApplications", getApplications().map((entry) => entry.application.name));
   check("getActivitySources", getActivitySources());
+
+  check("listPackageEntries", listPackageEntries().map((entry) => entry.name));
+  check(
+    "getDataExports",
+    getDataExports().map((section) => `${section.schema}/${section.slug}:${section.recordCount}`),
+  );
+  const ads = getAds();
+  check("getAds", { traits: ads.traits ? Object.keys(ads.traits).length : 0, quests: ads.questStatus.length });
+  check(
+    "getSupportTickets",
+    getSupportTickets().tickets.map((ticket) => `${ticket.id}:${ticket.comments.length}`),
+  );
+  check(
+    "getActivityGroups",
+    getActivityGroups().map((group) => `${group.name}:${group.files.length}`),
+  );
+  check("getRecentAvatars", getRecentAvatars().map((avatar) => avatar.assetPath));
 
   const guilds = timed("listGuilds", () => listGuilds());
   check("listGuilds.length", guilds.length);
@@ -185,7 +208,7 @@ function main(): void {
     listChannelsForUser(dmPartner).map((channel) => ({ id: channel.id, type: channel.type, n: channel.messageCount })),
   );
 
-  check("resolvePackageAsset", resolvePackageAsset("account/avatar.gif"));
+  check("resolvePackageAsset", resolvePackageAsset(getUserAvatarPath() ?? "account/avatar.png"));
   check("resolvePackageAsset(guild icon)", guild?.assets.icon ? resolvePackageAsset(guild.assets.icon)?.mimeType : null);
   check("resolvePackageAsset(emoji)", guild?.assets.emoji[0] ? resolvePackageAsset(guild.assets.emoji[0].path)?.relativePath : null);
   check("resolvePackageAsset(traversal)", resolvePackageAsset("../../package.json"));

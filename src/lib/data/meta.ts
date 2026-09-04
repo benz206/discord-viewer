@@ -13,9 +13,12 @@ export function getOwnerId(): string | null {
   return row?.value ?? null;
 }
 
+/** Discord names this avatar.gif, .png or .jpeg depending on what was uploaded. */
 export function getUserAvatarPath(): string | null {
-  const relative = "account/avatar.gif";
-  return fs.existsSync(packageFile(relative)) ? relative : null;
+  const dir = packageFile("account");
+  if (!fs.existsSync(dir)) return null;
+  const name = fs.readdirSync(dir).find((entry) => /^avatar\.[a-z0-9]+$/i.test(entry));
+  return name ? `account/${name}` : null;
 }
 
 export function getApplications(): ApplicationEntry[] {
