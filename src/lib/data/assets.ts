@@ -3,6 +3,7 @@ import "server-only";
 import fs from "node:fs";
 import path from "node:path";
 import { PACKAGE_DIR } from "./db";
+import { resolvePackagePath } from "./package-path";
 import type { ResolvedAsset } from "./types";
 
 const MIME_TYPES: Record<string, string> = {
@@ -27,9 +28,14 @@ export function resolvePackageAsset(relativePath: string): ResolvedAsset | null 
   })();
   if (decoded.includes("\0")) return null;
 
-  const absolute = path.resolve(PACKAGE_DIR, decoded.replace(/^\/+/, ""));
+  const requested = path.resolve(PACKAGE_DIR, decoded.replace(/^\/+/, ""));
   const root = path.resolve(PACKAGE_DIR);
-  if (absolute !== root && !absolute.startsWith(`${root}${path.sep}`)) return null;
+  if (requested !== root && !requested.startsWith(`${root}${path.sep}`)) return null;
+
+  // The traversal guard above already pinned the path inside the package, so it
+  // is safe to re-resolve it case-insensitively for packages whose folders are
+  // capitalized ("Account/") while our links are lowercase.
+  const absolute = resolvePackagePath(root, path.relative(root, requested));
 
   let stats: fs.Stats;
   try {

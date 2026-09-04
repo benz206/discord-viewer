@@ -2,6 +2,7 @@ import "server-only";
 
 import fs from "node:fs";
 import path from "node:path";
+import { resolvePackagePath } from "./package-path";
 import { openDatabase, type SqliteDatabase } from "./sqlite";
 
 export const PACKAGE_DIR = path.join(process.cwd(), "data", "package");
@@ -21,7 +22,7 @@ export function db(): SqliteDatabase {
 }
 
 export function packageFile(...segments: string[]): string {
-  return path.join(PACKAGE_DIR, ...segments);
+  return resolvePackagePath(PACKAGE_DIR, ...segments);
 }
 
 export function readPackageJson<T>(...segments: string[]): T | null {

@@ -4,16 +4,23 @@
 import fs from "node:fs";
 import path from "node:path";
 import { parse } from "csv-parse";
+import { resolvePackagePath } from "../src/lib/data/package-path";
 import { openDatabase, type SqliteDatabase } from "../src/lib/data/sqlite";
 
 const ROOT = process.cwd();
 const PACKAGE_DIR = path.join(ROOT, "data", "package");
 const DB_PATH = path.join(ROOT, "data", "index.db");
 
+/** Package-relative path, matched case-insensitively against what is on disk. */
+function pkg(...segments: string[]): string {
+  return resolvePackagePath(PACKAGE_DIR, ...segments);
+}
+
 const ACTIVITY_DOMAINS = [
   { domain: "Tns", dir: "activity/tns" },
   { domain: "Reporting", dir: "activity/reporting" },
   { domain: "Modeling", dir: "activity/modeling" },
+  { domain: "Analytics", dir: "activity/analytics" },
 ];
 
 const SUMMARY_KEYS = [
@@ -247,7 +254,7 @@ function recordUser(
 }
 
 function ingestAccount(db: SqliteDatabase): void {
-  const user = readJson<Json>(path.join(PACKAGE_DIR, "account", "user.json"));
+  const user = readJson<Json>(pkg("account", "user.json"));
   if (!user) return;
   recordUser(user.id as string, "account", {
     name: user.username as string,
@@ -268,7 +275,7 @@ function ingestAccount(db: SqliteDatabase): void {
   }
   db.prepare("INSERT INTO meta (key, value) VALUES (?, ?)").run("owner_id", String(user.id ?? ""));
 
-  const appsDir = path.join(PACKAGE_DIR, "account", "applications");
+  const appsDir = pkg("account", "applications");
   if (!fs.existsSync(appsDir)) return;
   for (const appId of fs.readdirSync(appsDir)) {
     const app = readJson<Json>(path.join(appsDir, appId, "application.json"));
@@ -283,8 +290,70 @@ function ingestAccount(db: SqliteDatabase): void {
   }
 }
 
+// Newer packages moved billing/store/promotions data out of account/user.json and
+// into account/user_data_exports/<schema>/<section>.json, each an envelope of
+// { section, generated_at, record_count, metadata, records }. The records are read
+// straight off disk by the UI; here we only mine them for user ids so that people
+// who appear solely as, say, a gift sender still land in the user directory.
+const EXPORT_USER_ID_KEYS: Array<[key: string, source: string]> = [
+  ["user_id", "data_export"],
+  ["owner_id", "data_export"],
+  ["gifter_user_id", "entitlement_gifter"],
+  ["gift_user_id", "entitlement_gifter"],
+];
+
+function ingestDataExports(): number {
+  const root = pkg("account", "user_data_exports");
+  if (!fs.existsSync(root)) return 0;
+  let files = 0;
+  for (const schema of fs.readdirSync(root)) {
+    const schemaDir = path.join(root, schema);
+    if (!fs.statSync(schemaDir).isDirectory()) continue;
+    for (const name of fs.readdirSync(schemaDir)) {
+      if (!name.endsWith(".json")) continue;
+      files += 1;
+      const payload = readJson<Json>(path.join(schemaDir, name));
+      for (const record of (payload?.records as Json[]) ?? []) {
+        for (const [key, source] of EXPORT_USER_ID_KEYS) {
+          const value = record[key];
+          if (typeof value === "string") recordUser(value, source);
+        }
+      }
+    }
+  }
+  return files;
+}
+
+// Ads/, Activities/ and Support_Tickets/ are whole top-level folders that older
+// packages did not ship. Nothing here needs an index, but the ids they mention
+// belong in the user directory alongside everything else.
+function ingestSideFolders(): void {
+  for (const name of ["traits.json", "quests_user_status.json"]) {
+    const file = pkg("ads", name);
+    if (!fs.existsSync(file)) continue;
+    const payload = readJson<Json | Json[]>(file);
+    for (const entry of Array.isArray(payload) ? payload : [payload ?? {}]) {
+      recordUser(entry.user_id as string, "ads");
+    }
+  }
+
+  const activitiesRoot = pkg("activities");
+  if (fs.existsSync(activitiesRoot)) {
+    for (const group of fs.readdirSync(activitiesRoot)) {
+      const userFile = path.join(activitiesRoot, group, "users", "user.json");
+      if (!fs.existsSync(userFile)) continue;
+      const profile = readJson<Json>(userFile);
+      recordUser(profile?.discord_id as string, "activity_profile", {
+        name: profile?.username as string,
+        discriminator: profile?.discriminator as string,
+        avatar: (profile?.avatar as string) ?? null,
+      });
+    }
+  }
+}
+
 function ingestGuilds(db: SqliteDatabase): number {
-  const index = readJson<Record<string, string>>(path.join(PACKAGE_DIR, "servers", "index.json")) ?? {};
+  const index = readJson<Record<string, string>>(pkg("servers", "index.json")) ?? {};
   const insert = db.prepare(`
     INSERT INTO guilds (
       id, name, owner_id, icon_file, has_guild_json, has_channels, has_audit_log,
@@ -299,7 +368,7 @@ function ingestGuilds(db: SqliteDatabase): number {
 
   const run = db.transaction(() => {
     for (const [id, name] of Object.entries(index)) {
-      const dir = path.join(PACKAGE_DIR, "servers", id);
+      const dir = pkg("servers", id);
       const guild = readJson<Json>(path.join(dir, "guild.json"));
       const channels = readJson<Json[]>(path.join(dir, "channels.json"));
       const auditLog = readJson<Json[]>(path.join(dir, "audit-log.json"));
@@ -345,8 +414,8 @@ function ingestGuilds(db: SqliteDatabase): number {
 }
 
 function ingestChannels(db: SqliteDatabase): number {
-  const index = readJson<Record<string, string | null>>(path.join(PACKAGE_DIR, "messages", "index.json")) ?? {};
-  const messagesDir = path.join(PACKAGE_DIR, "messages");
+  const index = readJson<Record<string, string | null>>(pkg("messages", "index.json")) ?? {};
+  const messagesDir = pkg("messages");
   const dirs = fs.readdirSync(messagesDir).filter((entry) => entry.startsWith("c"));
 
   const insert = db.prepare(`
@@ -394,7 +463,7 @@ function ingestChannels(db: SqliteDatabase): number {
 }
 
 async function ingestMessages(db: SqliteDatabase): Promise<number> {
-  const messagesDir = path.join(PACKAGE_DIR, "messages");
+  const messagesDir = pkg("messages");
   const dirs = fs.readdirSync(messagesDir).filter((entry) => entry.startsWith("c"));
 
   const insertMessage = db.prepare("INSERT OR REPLACE INTO messages (id, channel_id, ts, contents, attachments) VALUES (?, ?, ?, ?, ?)");
@@ -501,7 +570,7 @@ function ingestActivity(db: SqliteDatabase): number {
 
   let total = 0;
   for (const { domain, dir } of ACTIVITY_DOMAINS) {
-    const absoluteDir = path.join(PACKAGE_DIR, dir);
+    const absoluteDir = pkg(dir);
     if (!fs.existsSync(absoluteDir)) continue;
     for (const name of fs.readdirSync(absoluteDir).sort()) {
       if (!name.endsWith(".json")) continue;
@@ -611,6 +680,9 @@ async function main(): Promise<void> {
 
   log("account…");
   ingestAccount(db);
+  const dataExportFileCount = ingestDataExports();
+  ingestSideFolders();
+  log(`  ${dataExportFileCount} data export files`);
 
   log("guilds…");
   const guildCount = ingestGuilds(db);
@@ -667,6 +739,7 @@ async function main(): Promise<void> {
     guildCount,
     activityEventCount: activityCount,
     activityEventTypeCount: typeCount,
+    dataExportFileCount,
     userCount,
     firstMessageTs: range.min_ts,
     lastMessageTs: range.max_ts,
