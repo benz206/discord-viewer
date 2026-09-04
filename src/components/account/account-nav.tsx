@@ -9,11 +9,15 @@ import {
   Contact,
   CreditCard,
   Gamepad2,
+  Joystick,
   Library,
+  LifeBuoy,
   Link2,
+  Megaphone,
   Monitor,
   Settings,
   StickyNote,
+  Table2,
   User,
   UserPlus,
   Users,
@@ -45,6 +49,7 @@ const GROUPS: Array<{ label: string; items: NavItem[] }> = [
     items: [
       { href: "/account/billing", label: "Billing", icon: CreditCard, countKey: "payments" },
       { href: "/account/library", label: "Library", icon: Library, countKey: "library" },
+      { href: "/account/data-exports", label: "Data Exports", icon: Table2, countKey: "dataExports" },
     ],
   },
   {
@@ -55,6 +60,9 @@ const GROUPS: Array<{ label: string; items: NavItem[] }> = [
       { href: "/account/activity-stats", label: "Activity Statistics", icon: Gamepad2, countKey: "activityStats" },
       { href: "/account/friend-suggestions", label: "Friend Suggestions", icon: UserPlus, countKey: "friendSuggestions" },
       { href: "/account/external-friends", label: "External Friends", icon: Contact, countKey: "externalFriends" },
+      { href: "/account/activities", label: "Activities", icon: Joystick, countKey: "activities" },
+      { href: "/account/ads", label: "Ads & Quests", icon: Megaphone, countKey: "ads" },
+      { href: "/account/support-tickets", label: "Support Tickets", icon: LifeBuoy, countKey: "supportTickets" },
     ],
   },
   {

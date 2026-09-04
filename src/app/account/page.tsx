@@ -7,7 +7,7 @@ import { Avatar } from "@/components/common/avatar";
 import { JsonViewer } from "@/components/common/json-viewer";
 import { FieldList } from "@/components/account/field-list";
 import { Card, Mono, Pill, Section, SettingsPage } from "@/components/account/section";
-import { USER_FLAGS, decodeFlags } from "@/components/account/enums";
+import { USER_FLAGS, describeFlags } from "@/components/account/enums";
 import { asRecord, discriminatorTag, formatNumber, type Rec } from "@/components/account/format";
 
 const COLLECTION_KEYS = new Set([
@@ -25,6 +25,9 @@ const COLLECTION_KEYS = new Set([
   "user_activity_application_statistics",
   "notes",
   "user_profile_metadata",
+  "application_user_role_connections",
+  "lobby_members",
+  "user_achievements",
 ]);
 
 export default function MyAccountPage() {
@@ -33,8 +36,9 @@ export default function MyAccountPage() {
 
   const raw = user as unknown as Rec;
   const identity = Object.fromEntries(Object.entries(raw).filter(([key]) => !COLLECTION_KEYS.has(key)));
-  const flags = decodeFlags(user.flags, USER_FLAGS);
+  const flags = describeFlags(user.flags, USER_FLAGS);
   const avatarPath = getUserAvatarPath();
+  const avatarName = avatarPath ? avatarPath.split("/").pop() : null;
   const profileMetadata = asRecord(raw.user_profile_metadata);
 
   return (
@@ -61,8 +65,12 @@ export default function MyAccountPage() {
         />
         <div className="min-w-0 flex-1">
           <p className="text-xl font-semibold text-header">
-            {user.username}
-            <span className="text-channel">{discriminatorTag(user.discriminator)}</span>
+            {user.global_name ?? user.username}
+            {user.discriminator === undefined ? (
+              <span className="text-channel"> @{user.username}</span>
+            ) : (
+              <span className="text-channel">{discriminatorTag(user.discriminator)}</span>
+            )}
           </p>
           <Mono className="block pt-0.5">{user.id}</Mono>
           <div className="flex flex-wrap gap-1.5 pt-2">
@@ -72,12 +80,14 @@ export default function MyAccountPage() {
             {user.temp_banned_until ? <Pill tone="danger">Temp banned</Pill> : null}
           </div>
         </div>
-        <a
-          href={`/api/asset/${avatarPath ?? "account/avatar.gif"}`}
-          className="inline-flex items-center gap-1.5 rounded bg-surface-3 px-2.5 py-1.5 text-sm text-interactive hover:text-interactive-hover"
-        >
-          <Download className="size-4" /> avatar.gif
-        </a>
+        {avatarPath ? (
+          <a
+            href={`/api/asset/${avatarPath}`}
+            className="inline-flex items-center gap-1.5 rounded bg-surface-3 px-2.5 py-1.5 text-sm text-interactive hover:text-interactive-hover"
+          >
+            <Download className="size-4" /> {avatarName}
+          </a>
+        ) : null}
       </Card>
 
       <Section title="Account fields" count={Object.keys(identity).length}>
@@ -97,15 +107,17 @@ export default function MyAccountPage() {
               ),
               flags: (
                 <div className="flex flex-col gap-1.5">
-                  <Mono>
-                    {formatNumber(user.flags)} · 0x{user.flags.toString(16)} · 0b{user.flags.toString(2)}
-                  </Mono>
+                  {typeof user.flags === "number" ? (
+                    <Mono>
+                      {formatNumber(user.flags)} · 0x{user.flags.toString(16)} · 0b{user.flags.toString(2)}
+                    </Mono>
+                  ) : null}
                   <div className="flex flex-wrap gap-1.5">
                     {flags.length === 0 ? (
                       <span className="text-sm text-faint">No flags set</span>
                     ) : (
                       flags.map((flag) => (
-                        <Pill key={flag.bit} tone={flag.known ? "brand" : "neutral"} title={`bit ${flag.bit}`}>
+                        <Pill key={flag.key} tone={flag.known ? "brand" : "neutral"} title={flag.title}>
                           {flag.label}
                         </Pill>
                       ))

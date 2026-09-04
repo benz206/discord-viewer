@@ -151,6 +151,46 @@ export function decodeFlags(value: number, names: Record<number, string>): Decod
   return flags;
 }
 
+export interface NamedFlag {
+  key: string;
+  label: string;
+  known: boolean;
+  title: string;
+}
+
+const FLAG_WORDS: Record<string, string> = {
+  HYPESQUAD: "HypeSquad",
+  MFA: "MFA",
+  SMS: "SMS",
+  HTTP: "HTTP",
+  NSFW: "NSFW",
+  URL: "URL",
+};
+
+function titleCaseFlagName(name: string): string {
+  return name
+    .split("_")
+    .map((word) => FLAG_WORDS[word] ?? word.charAt(0) + word.slice(1).toLowerCase())
+    .join(" ");
+}
+
+/**
+ * Older packages export user flags as a bitfield; current ones export an array of
+ * flag names. Renders either into the same pill list.
+ */
+export function describeFlags(value: number | string[] | undefined, names: Record<number, string>): NamedFlag[] {
+  if (Array.isArray(value)) {
+    return value.map((name) => ({ key: name, label: titleCaseFlagName(name), known: true, title: name }));
+  }
+  if (typeof value !== "number") return [];
+  return decodeFlags(value, names).map((flag) => ({
+    key: String(flag.bit),
+    label: flag.label,
+    known: flag.known,
+    title: `bit ${flag.bit}`,
+  }));
+}
+
 export function enumName(map: Record<number, string>, value: unknown): string {
   return typeof value === "number" ? (map[value] ?? `Unknown (${value})`) : String(value);
 }

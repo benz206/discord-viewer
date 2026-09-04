@@ -139,14 +139,17 @@ export interface ActivityApplicationStatistic {
 export interface AccountUser {
   id: string;
   username: string;
-  discriminator: number;
+  /** Dropped once Discord retired discriminators in favour of global_name. */
+  discriminator?: number;
+  global_name?: string | null;
   email: string;
   verified: boolean;
   avatar_hash: string | null;
   has_mobile: boolean;
   needs_email_verification: boolean;
   premium_until: string | null;
-  flags: number;
+  /** A bitfield in older packages; current ones export an array of flag names. */
+  flags: number | string[];
   phone: string | null;
   temp_banned_until: string | null;
   ip: string;
@@ -156,14 +159,27 @@ export interface AccountUser {
   friend_suggestions: unknown[];
   user_sessions: UserSession[];
   relationships: Relationship[];
-  payments: Payment[];
-  payment_sources: PaymentSource[];
   guild_settings: GuildSetting[];
   library_applications: unknown[];
-  entitlements: Entitlement[];
   user_activity_application_statistics: ActivityApplicationStatistic[];
   notes: Record<string, string>;
   user_profile_metadata: Record<string, unknown>;
+  // Newer packages moved these three into account/user_data_exports/discord_billing.
+  payments?: Payment[];
+  payment_sources?: PaymentSource[];
+  entitlements?: Entitlement[];
+  // Added by newer packages.
+  application_user_role_connections?: ApplicationRoleConnection[];
+  lobby_members?: unknown[];
+  current_orbs_balance?: number;
+  user_achievements?: unknown[];
+}
+
+export interface ApplicationRoleConnection {
+  platform_name: string | null;
+  platform_username: string | null;
+  metadata: Record<string, unknown>;
+  application_id: string;
 }
 
 export interface Application {
@@ -464,6 +480,8 @@ export interface PackageStats {
   guildCount: number;
   activityEventCount: number;
   activityEventTypeCount: number;
+  /** Files under account/user_data_exports; absent from indexes built before it existed. */
+  dataExportFileCount?: number;
   userCount: number;
   firstMessageTs: number | null;
   lastMessageTs: number | null;

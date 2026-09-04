@@ -48,6 +48,39 @@ const SUMMARY_KEYS = [
   "search_type",
 ];
 
+// channel.json used to carry Discord's numeric channel type; current packages
+// write the API's enum name instead. Everything downstream (the channels table,
+// CHANNEL_TYPES, the DM/group-DM split) still speaks numbers, so map on the way in.
+const CHANNEL_TYPE_IDS: Record<string, number> = {
+  GUILD_TEXT: 0,
+  DM: 1,
+  GUILD_VOICE: 2,
+  GROUP_DM: 3,
+  GUILD_CATEGORY: 4,
+  GUILD_ANNOUNCEMENT: 5,
+  ANNOUNCEMENT_THREAD: 10,
+  PUBLIC_THREAD: 11,
+  PRIVATE_THREAD: 12,
+  GUILD_STAGE_VOICE: 13,
+  GUILD_DIRECTORY: 14,
+  GUILD_FORUM: 15,
+  GUILD_MEDIA: 16,
+};
+
+const unknownChannelTypes = new Set<string>();
+
+function channelTypeId(value: unknown): number {
+  if (typeof value === "number") return value;
+  if (typeof value === "string") {
+    const mapped = CHANNEL_TYPE_IDS[value];
+    if (mapped !== undefined) return mapped;
+    const numeric = Number(value);
+    if (!Number.isNaN(numeric)) return numeric;
+    unknownChannelTypes.add(value);
+  }
+  return 0;
+}
+
 const GUILD_ID_KEYS = ["guild_id", "server", "guild"];
 const CHANNEL_ID_KEYS = ["channel_id", "channel"];
 const MESSAGE_ID_KEYS = ["message_id"];
@@ -178,7 +211,8 @@ function readJson<T>(file: string): T | null {
   }
 }
 
-function parseCsvTimestamp(value: string): number {
+/** Reads "YYYY-MM-DD HH:MM:SS[.mmm]" and the ISO "T"-separated form alike. */
+function parseExportTimestamp(value: string): number {
   const year = Number(value.slice(0, 4));
   const month = Number(value.slice(5, 7));
   const day = Number(value.slice(8, 10));
@@ -433,8 +467,9 @@ function ingestChannels(db: SqliteDatabase): number {
       const guild = channel.guild as Json | undefined;
       const recipients = (channel.recipients as string[]) ?? null;
       const indexName = index[id] ?? null;
+      const type = channelTypeId(channel.type);
 
-      if (recipients && channel.type === 1 && indexName?.startsWith("Direct Message with ")) {
+      if (recipients && type === 1 && indexName?.startsWith("Direct Message with ")) {
         const label = indexName.slice("Direct Message with ".length);
         const hashAt = label.lastIndexOf("#");
         const name = hashAt > 0 ? label.slice(0, hashAt) : label;
@@ -450,7 +485,7 @@ function ingestChannels(db: SqliteDatabase): number {
       insert.run(
         id,
         (channel.name as string) ?? null,
-        (channel.type as number) ?? 0,
+        type,
         (guild?.id as string) ?? null,
         (guild?.name as string) ?? null,
         indexName,
@@ -460,6 +495,49 @@ function ingestChannels(db: SqliteDatabase): number {
   });
   run();
   return dirs.length;
+}
+
+interface MessageRecord {
+  id: string;
+  timestamp: string;
+  contents: string;
+  attachments: string;
+}
+
+/**
+ * Yields a channel's messages from whichever transcript the package ships.
+ * Current exports write messages.json (an array of {ID, Timestamp, Contents,
+ * Attachments}, with ID as a number); older ones wrote messages.csv with the
+ * same columns. Both timestamps are fixed-width, so parseExportTimestamp reads
+ * either "2022-08-02 00:59:59" or the ISO form.
+ */
+async function* readChannelMessages(dir: string): AsyncGenerator<MessageRecord> {
+  const jsonFile = path.join(dir, "messages.json");
+  if (fs.existsSync(jsonFile)) {
+    for (const row of readJson<Json[]>(jsonFile) ?? []) {
+      yield {
+        id: row.ID === null || row.ID === undefined ? "" : String(row.ID),
+        timestamp: typeof row.Timestamp === "string" ? row.Timestamp : "",
+        contents: typeof row.Contents === "string" ? row.Contents : "",
+        attachments: typeof row.Attachments === "string" ? row.Attachments : "",
+      };
+    }
+    return;
+  }
+
+  const csvFile = path.join(dir, "messages.csv");
+  if (!fs.existsSync(csvFile)) return;
+  const parser = fs
+    .createReadStream(csvFile)
+    .pipe(parse({ columns: true, bom: true, relax_quotes: true, skip_empty_lines: true, record_delimiter: ["\r\n", "\n"] }));
+  for await (const record of parser as AsyncIterable<Record<string, string>>) {
+    yield {
+      id: record.ID ?? "",
+      timestamp: record.Timestamp ?? "",
+      contents: record.Contents ?? "",
+      attachments: record.Attachments ?? "",
+    };
+  }
 }
 
 async function ingestMessages(db: SqliteDatabase): Promise<number> {
@@ -477,26 +555,18 @@ async function ingestMessages(db: SqliteDatabase): Promise<number> {
   db.exec("BEGIN");
   for (const dir of dirs) {
     const id = dir.slice(1);
-    const file = path.join(messagesDir, dir, "messages.csv");
-    if (!fs.existsSync(file)) continue;
 
     const days = new Map<string, number>();
     let count = 0;
     let firstTs: number | null = null;
     let lastTs: number | null = null;
 
-    const parser = fs
-      .createReadStream(file)
-      .pipe(parse({ columns: true, bom: true, relax_quotes: true, skip_empty_lines: true, record_delimiter: ["\r\n", "\n"] }));
-
-    for await (const record of parser as AsyncIterable<Record<string, string>>) {
-      const messageId = record.ID;
-      const timestamp = record.Timestamp;
-      if (!messageId || !timestamp) continue;
-      const ts = parseCsvTimestamp(timestamp);
+    for await (const record of readChannelMessages(path.join(messagesDir, dir))) {
+      if (!record.id || !record.timestamp) continue;
+      const ts = parseExportTimestamp(record.timestamp);
       if (Number.isNaN(ts)) continue;
-      insertMessage.run(messageId, id, ts, record.Contents ?? "", record.Attachments || null);
-      const day = timestamp.slice(0, 10);
+      insertMessage.run(record.id, id, ts, record.contents, record.attachments || null);
+      const day = record.timestamp.slice(0, 10);
       days.set(day, (days.get(day) ?? 0) + 1);
       count += 1;
       if (firstTs === null || ts < firstTs) firstTs = ts;
@@ -691,6 +761,9 @@ async function main(): Promise<void> {
   log("channels…");
   const channelCount = ingestChannels(db);
   log(`  ${channelCount} channels`);
+  if (unknownChannelTypes.size > 0) {
+    log(`  warning: unmapped channel types: ${[...unknownChannelTypes].sort().join(", ")}`);
+  }
 
   log("messages…");
   const messageCount = await ingestMessages(db);

@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 
 import { getUser } from "@/lib/data/meta";
+import { getDataExportsBySchema } from "@/lib/data/package-extras";
 import { EmptyState } from "@/components/common/empty-state";
 import { JsonViewer } from "@/components/common/json-viewer";
 import { FieldList } from "@/components/account/field-list";
@@ -45,12 +46,18 @@ export default function BillingPage() {
   const user = getUser();
   if (!user) notFound();
 
-  const payments = asRecords(user.payments);
-  const sources = asRecords(user.payment_sources);
-  const entitlements = asRecords(user.entitlements);
+  // Older packages inline these in user.json; newer ones ship them as separate
+  // account/user_data_exports/discord_billing sections with the same record shape.
+  const billing = getDataExportsBySchema("discord_billing");
+  const sectionRecords = (slug: string) => billing.find((section) => section.slug === slug)?.records ?? [];
+
+  const payments = user.payments ? asRecords(user.payments) : sectionRecords("payments");
+  const sources = user.payment_sources ? asRecords(user.payment_sources) : sectionRecords("payment_sources");
+  const entitlements = user.entitlements ? asRecords(user.entitlements) : sectionRecords("entitlements");
+  const origin = billing.length > 0 && !user.payments ? "account/user_data_exports/discord_billing" : "account/user.json";
 
   return (
-    <SettingsPage title="Billing" description="Payments, payment sources, and entitlements from account/user.json.">
+    <SettingsPage title="Billing" description={`Payments, payment sources, and entitlements from ${origin}.`}>
       <Section title="Payments" count={payments.length}>
         {payments.length === 0 ? <EmptyState title="No payments" description="payments is empty." /> : null}
         {payments.map((payment) => {
@@ -123,14 +130,15 @@ export default function BillingPage() {
 
       <Section title="Entitlements" count={entitlements.length}>
         {entitlements.length === 0 ? <EmptyState title="No entitlements" description="entitlements is empty." /> : null}
-        {entitlements.map((entitlement) => (
-          <Card key={String(entitlement.id)} className="flex flex-col gap-3">
+        {entitlements.map((entitlement, index) => (
+          // Entitlements carry no id in the user_data_exports form, so fall back to position.
+          <Card key={String(entitlement.id ?? `${entitlement.sku_id}-${index}`)} className="flex flex-col gap-3">
             <div className="flex flex-wrap items-center gap-3">
               <span className="min-w-0 flex-1 truncate text-sm font-semibold text-header">
                 {String(entitlement.sku_name ?? entitlement.sku_id ?? entitlement.id)}
               </span>
               <Pill tone="brand">{enumName(ENTITLEMENT_TYPES, entitlement.type)}</Pill>
-              {entitlement.deleted ? <Pill tone="danger">Deleted</Pill> : null}
+              {entitlement.deleted || entitlement.deleted_at ? <Pill tone="danger">Deleted</Pill> : null}
             </div>
             <FieldList
               value={entitlement}
@@ -148,11 +156,7 @@ export default function BillingPage() {
 
       <Section title="Raw billing data">
         <JsonViewer
-          value={{
-            payments: user.payments,
-            payment_sources: user.payment_sources,
-            entitlements: user.entitlements,
-          }}
+          value={{ payments, payment_sources: sources, entitlements }}
           name="billing"
           defaultExpandedDepth={1}
           className="max-h-[28rem]"
